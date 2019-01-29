@@ -15,7 +15,6 @@ const (
 	defaultPostgresPassword             = "mysecretpassword"
 	defaultPostgresSSLMode              = "disable"
 	defaultPostgresConnectionTimeout    = 5
-	defaultPostgresTransactionTimeout   = 5 * time.Minute
 	defaultPostgresConnectionRetrySleep = time.Second
 	defaultPostgresConnectionMaxIdle    = -1
 	defaultPostgresConnectionMaxOpen    = -1
