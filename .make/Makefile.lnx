@@ -1,0 +1,5 @@
+CONTAINER_RUN = podman
+
+# Local Variables:
+# mode: makefile
+# End:
