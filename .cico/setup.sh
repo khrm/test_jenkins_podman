@@ -72,30 +72,6 @@ function deploy() {
   echo 'CICO: Image pushed, ready to update deployed app'
 }
 
-function check_up() {
-    service=$1
-    host=$2
-    port=$3
-    max=30 # 1 minute
-
-    counter=1
-    while true;do
-        python -c "import socket;s = socket.socket(socket.AF_INET, socket.SOCK_STREAM);s.connect(('$host', $port))" \
-        >/dev/null 2>/dev/null && break || \
-        echo "CICO: Waiting that $service on ${host}:${port} is started (sleeping for 2)"
-
-        if [[ ${counter} == ${max} ]];then
-            echo "CICO: Could not connect to ${service} after some time"
-            echo "CICO: Investigate locally the logs with fig logs"
-            exit 1
-        fi
-
-        sleep 2
-
-        (( counter++ ))
-    done
-}
-
 function compile() {
     make build
 }
@@ -105,28 +81,6 @@ function do_coverage() {
 
     # Upload to codecov
     bash <(curl -s https://codecov.io/bash) -K -X search -f tmp/coverage.out -t 42dafca1-797d-48c5-95bf-2b17cf7f5d96
-}
-
-function download_latest_oc() {
-    pushd /bin >/dev/null && \
-curl -s -L $(curl -L -s "https://api.github.com/repos/openshift/origin/releases/latest"|python -c "import sys, json;x=json.load(sys.stdin);print([ r['browser_download_url'] for r in x['assets'] if 'openshift-origin-client-tools' in r['name'] and 'linux-64bit' in r['name']][0])") -o /tmp/oc.tgz && \
-    tar xz -f/tmp/oc.tgz --wildcards "*/oc" --strip-components=1 && \
-popd >/dev/null
-}
-
-function deploy_devcluster() {
-    project="${1}"
-
-    download_latest_oc || { yum install centos-release-openshift-origin && yum install origin-clients ;}
-
-    oc login --insecure-skip-tls-verify=true https://devtools-dev.ext.devshift.net:8443 --token=${FABRIC8_DEVCLUSTER_TOKEN}
-
-    exist=$(oc get project -o go-template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}'|grep "^${project}$" || true)
-    if [[ -z ${exist} ]];then
-        oc new-project ${project}
-    fi
-    oc project ${project}
-    bash ./openshift/deploy-openshift-dev.sh
 }
 
 function do_test() {
