@@ -8,19 +8,29 @@ SOURCE_DIR ?= .
 SOURCES := $(shell find $(SOURCE_DIR) -path $(SOURCE_DIR)/vendor -prune -o -name '*.go' -print)
 DESIGN_DIR=design
 DESIGNS := $(shell find $(SOURCE_DIR)/$(DESIGN_DIR) -path $(SOURCE_DIR)/vendor -prune -o -name '*.go' -print)
+ALL_PKGS_EXCLUDE_PATTERN = 'vendor\|app\|tool\/cli\|design\|client\|test'
+GIT_BIN_NAME:=git
+GO_BIN_NAME:=go
+DEP_BIN_NAME:=dep
+GOAGEN_BIN=$(VENDOR_DIR)/github.com/goadesign/goa/goagen/goagen
+CONTAINER_RUN := docker
+
+# By default reduce the amount of log output from tests, set this to debug and GO_TEST_VERBOSITY_FLAG to -v to increase it
+F8_LOG_LEVEL ?= error
+GO_TEST_VERBOSITY_FLAG =-v
 
 # declares variable that are OS-sensitive
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ifeq ($(OS),Windows_NT)
 include $(SELF_DIR)Makefile.win
 else
-include $(SELF_DIR)Makefile.lnx
+include $(SELF_DIR)/.make/Makefile.lnx
 endif
 
 # This is a fix for a non-existing user in passwd file when running in a docker
 # container and trying to clone repos of dependencies
-GIT_COMMITTER_NAME ?= "user"
-GIT_COMMITTER_EMAIL ?= "user@example.com"
+GIT_COMMITTER_NAME ?= "Khurram Baig"
+GIT_COMMITTER_EMAIL ?= "kbaig@redhat.com"
 export GIT_COMMITTER_NAME
 export GIT_COMMITTER_EMAIL
 
@@ -39,33 +49,51 @@ define log-info =
 endef
 
 # -------------------------------------------------------------------
-# Docker build
+# Container build
 # -------------------------------------------------------------------
 BUILD_DIR = bin
 REGISTRY_URI = quay.io
-REGISTRY_NS = ${PROJECT_NAME}
+REGISTRY_NS = fabric8-services
 REGISTRY_IMAGE = ${PROJECT_NAME}
 
 ifeq ($(TARGET),rhel)
-	REGISTRY_URL := ${REGISTRY_URI}/openshiftio/rhel-${REGISTRY_NS}-${REGISTRY_IMAGE}
-	DOCKERFILE := Dockerfile.rhel
+	REGISTRY_URL_IMAGE := ${REGISTRY_URI}/openshiftio/rhel-${REGISTRY_NS}-${REGISTRY_IMAGE}
+	CONTAINERFILE := Dockerfile.rhel
 else
-	REGISTRY_URL := ${REGISTRY_URI}/openshiftio/${REGISTRY_NS}-${REGISTRY_IMAGE}
-	DOCKERFILE := Dockerfile
+	REGISTRY_URL_IMAGE := ${REGISTRY_URI}/openshiftio/${REGISTRY_NS}-${REGISTRY_IMAGE}
+	CONTAINERFILE := Dockerfile
 endif
 
 $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
 .PHONY: build-linux $(BUILD_DIR)
-build-linux: makefiles prebuild-check deps generate ## Builds the Linux binary for the container image into bin/ folder
+build-linux: prebuild-check deps generate ## Builds the Linux binary for the container image into bin/ folder
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -v $(LDFLAGS) -o $(BUILD_DIR)/$(PROJECT_NAME)
 
+.PHONY: image
 image: clean-artifacts build-linux
-	docker build -t $(REGISTRY_URL) \
-	  --build-arg BUILD_DIR=$(BUILD_DIR)\
-	  --build-arg PROJECT_NAME=$(PROJECT_NAME)\
-	  -f $(VENDOR_DIR)/github.com/fabric8-services/fabric8-common/makefile/$(DOCKERFILE) .
+		$(CONTAINER_RUN) build -t $(REGISTRY_URL_IMAGE) -f $(CONTAINERFILE) .
+
+# -------------------------------------------------------------------
+# Unittest
+# -------------------------------------------------------------------
+.PHONY: test-unit
+test-unit: prebuild-check $(SOURCES) generate ## Runs the unit tests and WITHOUT producing coverage files for each package.
+	$(call log-info,"Running test: $@")
+	$(eval TEST_PACKAGES:=$(shell go list ./... | grep -v $(ALL_PKGS_EXCLUDE_PATTERN)))
+	F8_LOG_LEVEL=$(F8_LOG_LEVEL) \
+	go test $(GO_TEST_VERBOSITY_FLAG) $(TEST_PACKAGES)
+
+.PHONY: coverage
+coverage: prebuild-check deps $(SOURCES) ## Run coverage
+	$(call log-info,"Running coverage: $@")
+	$(eval TEST_PACKAGES:=$(shell go list ./... | grep -v $(ALL_PKGS_EXCLUDE_PATTERN)))
+	@cd $(VENDOR_DIR)/github.com/haya14busa/goverage && go build
+	F8_LOG_LEVEL=$(F8_LOG_LEVEL) \
+	./vendor/github.com/haya14busa/goverage/goverage -v -race -coverprofile=tmp/coverage.out $(TEST_PACKAGES)
+	sed -i~ -e '/\/main.go:/d' tmp/coverage.out
+	@go tool cover -func tmp/coverage.out
 
 # -------------------------------------------------------------------
 # help!
@@ -110,15 +138,15 @@ endif
 $(DEP_BIN_DIR):
 	mkdir -p $(DEP_BIN_DIR)
 
-.PHONY: deps 
+.PHONY: deps
 deps: $(DEP_BIN) $(VENDOR_DIR) ## Download build dependencies.
 
 # install dep in a the tmp/bin dir of the repo
-$(DEP_BIN): $(DEP_BIN_DIR) 
+$(DEP_BIN): $(DEP_BIN_DIR)
 	@echo "Installing 'dep' $(DEP_VERSION) at '$(DEP_BIN_DIR)'..."
 	mkdir -p $(DEP_BIN_DIR)
 ifeq ($(UNAME_S),Darwin)
-	@curl -L -s https://github.com/golang/dep/releases/download/$(DEP_VERSION)/dep-darwin-amd64 -o $(DEP_BIN) 
+	@curl -L -s https://github.com/golang/dep/releases/download/$(DEP_VERSION)/dep-darwin-amd64 -o $(DEP_BIN)
 	@cd $(DEP_BIN_DIR) && \
 	curl -L -s https://github.com/golang/dep/releases/download/$(DEP_VERSION)/dep-darwin-amd64.sha256 -o $(DEP_BIN_DIR)/dep-darwin-amd64.sha256 && \
 	echo "1544afdd4d543574ef8eabed343d683f7211202a65380f8b32035d07ce0c45ef  dep" > dep-darwin-amd64.sha256 && \
@@ -133,8 +161,8 @@ endif
 
 $(VENDOR_DIR): Gopkg.toml
 	@echo "checking dependencies with $(DEP_BIN_NAME)"
-	@$(DEP_BIN) ensure -v 
-		
+	@$(DEP_BIN) ensure -v
+
 # -------------------------------------------------------------------
 # Code format/check
 # -------------------------------------------------------------------
@@ -155,7 +183,7 @@ check-go-format: prebuild-check deps ## Exists with an error if there are files 
 	&& exit 1 \
 	|| true
 
-.PHONY: analyze-go-code 
+.PHONY: analyze-go-code
 analyze-go-code: deps golint gocyclo govet ## Run a complete static code analysis using the following tools: golint, gocyclo and go-vet.
 
 ## Run gocyclo analysis over the code.
@@ -259,4 +287,3 @@ generate: prebuild-check $(DESIGNS) $(GOAGEN_BIN) $(VENDOR_DIR) ## Generate GOA 
 	$(GOAGEN_BIN) gen -d ${PACKAGE_NAME}/${DESIGN_DIR} --pkg-path=github.com/fabric8-services/fabric8-common/goasupport/status --out app
 	$(GOAGEN_BIN) gen -d ${PACKAGE_NAME}/${DESIGN_DIR} --pkg-path=github.com/fabric8-services/fabric8-common/goasupport/jsonapi_errors_helpers --out app
 	$(GOAGEN_BIN) swagger -d ${PACKAGE_NAME}/${DESIGN_DIR}
-	
