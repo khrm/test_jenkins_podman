@@ -1,0 +1,111 @@
+kind: Template
+apiVersion: v1
+metadata:
+  name: f8webhook
+objects:
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    labels:
+      service: f8webhook
+    name: f8webhook
+  spec:
+    replicas: ${{REPLICAS}}
+    selector:
+      service: f8webhook
+    strategy:
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          service: f8webhook
+      spec:
+        containers:
+        - image: ${IMAGE}:${IMAGE_TAG}
+          env:
+          - name: F8_ENVIRONMENT
+            valueFrom:
+              configMapKeyRef:
+                name: f8webhook
+                key: environment
+          - name: F8_PROXY_URL
+            valueFrom:
+              configMapKeyRef:
+                name: f8webhook
+                key: proxy.url
+          imagePullPolicy: Always
+          name: f8webhook
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/status
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/status
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 0.1m
+              memory: 10Mi
+            limits:
+              cpu: 400m
+              memory: 1.5Gi
+          terminationMessagePath: /dev/termination-log
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - type: ConfigChange
+  status:
+    details:
+      causes:
+      - type: ConfigChange
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: f8webhook
+    labels:
+      service: f8webhook
+  spec:
+    ports:
+      - name: "8080"
+        protocol: TCP
+        port: 80
+        targetPort: 8080
+    selector:
+      service: f8webhook
+    type: ClusterIP
+    sessionAffinity: null
+parameters:
+- name: IMAGE
+  value: quay.io/openshiftio/rhel-fabric8-services-fabric8-webhook
+- name: IMAGE_TAG
+  value: latest
+- description: Number of deployment replicas
+  displayName: Number of deployment replicas
+  required: true
+  name: REPLICAS
+  value: '1'

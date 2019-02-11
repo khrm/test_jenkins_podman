@@ -1,0 +1,13 @@
+kind: Template
+apiVersion: v1
+metadata:
+  name: f8webhook
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: f8webhook
+  type: Opaque
+  data:
+    environment: prod-preview
+    proxy.url: https://jenkins.prod-preview.openshift.io
