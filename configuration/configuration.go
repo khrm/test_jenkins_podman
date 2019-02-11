@@ -1,7 +1,6 @@
 package configuration
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -22,7 +21,6 @@ const (
 	varLogJSON              = "log.json"
 	varLogLevel             = "log.level"
 	varMetricsHTTPAddress   = "metrics.http.address"
-	varSentryDSN            = "sentry.dsn"
 
 	// Postgres
 	varPostgresHost                 = "postgres.host"
@@ -179,77 +177,6 @@ func (c *Config) GetLogLevel() string {
 	return c.v.GetString(varLogLevel)
 }
 
-// GetPostgresHost returns the postgres host as set via default, config file, or environment variable
-func (c *Config) GetPostgresHost() string {
-	return c.v.GetString(varPostgresHost)
-}
-
-// GetPostgresPort returns the postgres port as set via default, config file, or environment variable
-func (c *Config) GetPostgresPort() int64 {
-	return c.v.GetInt64(varPostgresPort)
-}
-
-// GetPostgresUser returns the postgres user as set via default, config file, or environment variable
-func (c *Config) GetPostgresUser() string {
-	return c.v.GetString(varPostgresUser)
-}
-
-// GetPostgresDatabase returns the postgres database as set via default, config file, or environment variable
-func (c *Config) GetPostgresDatabase() string {
-	return c.v.GetString(varPostgresDatabase)
-}
-
-// GetPostgresPassword returns the postgres password as set via default, config file, or environment variable
-func (c *Config) GetPostgresPassword() string {
-	return c.v.GetString(varPostgresPassword)
-}
-
-// GetPostgresSSLMode returns the postgres sslmode as set via default, config file, or environment variable
-func (c *Config) GetPostgresSSLMode() string {
-	return c.v.GetString(varPostgresSSLMode)
-}
-
-// GetPostgresConnectionTimeout returns the postgres connection timeout as set via default, config file, or environment variable
-func (c *Config) GetPostgresConnectionTimeout() int64 {
-	return c.v.GetInt64(varPostgresConnectionTimeout)
-}
-
-// GetPostgresConnectionRetrySleep returns the number of seconds (as set via default, config file, or environment variable)
-// to wait before trying to connect again
-func (c *Config) GetPostgresConnectionRetrySleep() time.Duration {
-	return c.v.GetDuration(varPostgresConnectionRetrySleep)
-}
-
-// GetPostgresTransactionTimeout returns the number of minutes to timeout a transaction
-func (c *Config) GetPostgresTransactionTimeout() time.Duration {
-	return c.v.GetDuration(varPostgresTransactionTimeout)
-}
-
-// GetPostgresConnectionMaxIdle returns the number of connections that should be keept alive in the database connection pool at
-// any given time. -1 represents no restrictions/default behavior
-func (c *Config) GetPostgresConnectionMaxIdle() int {
-	return c.v.GetInt(varPostgresConnectionMaxIdle)
-}
-
-// GetPostgresConnectionMaxOpen returns the max number of open connections that should be open in the database connection pool.
-// -1 represents no restrictions/default behavior
-func (c *Config) GetPostgresConnectionMaxOpen() int {
-	return c.v.GetInt(varPostgresConnectionMaxOpen)
-}
-
-// GetPostgresConfigString returns a ready to use string for usage in sql.Open()
-func (c *Config) GetPostgresConfigString() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
-		c.GetPostgresHost(),
-		c.GetPostgresPort(),
-		c.GetPostgresUser(),
-		c.GetPostgresPassword(),
-		c.GetPostgresDatabase(),
-		c.GetPostgresSSLMode(),
-		c.GetPostgresConnectionTimeout(),
-	)
-}
-
 // GetProxyURL returns URL to forward Webhook
 func (c *Config) GetProxyURL() string {
 	return c.v.GetString(varProxyURL)
@@ -259,18 +186,4 @@ func (c *Config) GetProxyURL() string {
 // update ip ranges from source
 func (c *Config) GetMonitorIPDuration() time.Duration {
 	return c.v.GetDuration(varMonitorIPDuration)
-}
-
-// IsCleanTestDataEnabled return true if we want to have clean data enabled
-func (c *Config) IsCleanTestDataEnabled() bool {
-	return c.v.GetBool(varCleanTestDataEnabled)
-}
-
-func (c *Config) GetSentryDSN() string {
-	return c.v.GetString(varSentryDSN)
-}
-
-// Return True if we want to have DB Logs Enabled
-func (c *Config) IsDBLogsEnabled() bool {
-	return c.v.GetBool(varDBLogsEnabled)
 }
