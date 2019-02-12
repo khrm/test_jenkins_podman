@@ -14,9 +14,9 @@ osio {
 
     build resources:  [ImageStream:"podman-docker-test:latest"],
 
-    deploy resources:  [ImageStream:"podman-docker-test:latest"],, env: 'stage'
+    deploy resources:  [ImageStream:"podman-docker-test:latest"], env: 'stage'
 
-    deploy resources:  [ImageStream:"podman-docker-test:latest"],, env: 'run', approval: 'manual'
+    deploy resources:  [ImageStream:"podman-docker-test:latest"], env: 'run', approval: 'manual'
 
   } 
   
