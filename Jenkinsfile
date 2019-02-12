@@ -5,18 +5,18 @@ osio {
   config runtime: 'go'
 
   ci {
-    build resources: resources, strategy: [type: docker, file: "./Dockerfile"]
+    build resources: [ImageStream:"podman-docker-test:latest"], strategy: [type: docker, file: "./Dockerfile"]
 
   }
   
   
   cd {
 
-    build resources: resources
+    build resources:  [ImageStream:"podman-docker-test:latest"],
 
-    deploy resources: resources, env: 'stage'
+    deploy resources:  [ImageStream:"podman-docker-test:latest"],, env: 'stage'
 
-    deploy resources: resources, env: 'run', approval: 'manual'
+    deploy resources:  [ImageStream:"podman-docker-test:latest"],, env: 'run', approval: 'manual'
 
   } 
   
