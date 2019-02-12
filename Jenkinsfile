@@ -1,4 +1,4 @@
-@Library('github.com/fabric8io/osio-pipeline@master') _
+@Library('github.com/khrm/osio-pipeline@dockerfile-podman') _
 
 osio {
 
@@ -10,7 +10,7 @@ osio {
           RELEASE_VERSION: "1.0.${env.BUILD_NUMBER}"
     ])
 
-    build resources: resources
+    build resources: resources, strategy: [type: docker, file: "./Dockerfile"]
 
   }
 
